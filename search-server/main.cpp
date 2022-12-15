@@ -59,19 +59,16 @@ public:
 
     void AddDocument(int document_id, const string &document) {
         const vector<string> words = SplitIntoWordsNoStop(document);
+        map <string,int> word_count_buf;
         if (!words.empty()) { document_count_++; }
         for (const string &word: words) {
-            int word_count = count_if(words.begin(), words.end(),
-                                      [&word](string curr_word) { return word == curr_word; });
+            word_count_buf[word] += 1;
             term_frequency_[word].insert({
                                                  document_id,
-                                                 word_count / static_cast<double>(words.size())
-
+                                                 word_count_buf[word] /  static_cast<double>(words.size())
                                          });
 
         }
-
-
     }
 
     vector<Document> FindTopDocuments(const string &raw_query) const {
@@ -119,7 +116,7 @@ private:
         for (const string &word: SplitIntoWordsNoStop(text)) {
             if (word[0] != '-') {
                 query.plus_words.insert(word);
-            } else if (word[0] == '-') {
+            } else {
                 query.minus_words.insert(word.substr(1));
             }
 
@@ -130,7 +127,9 @@ private:
         }
         return query;
     }
-
+    double CalcIDF(string word) const{
+        return log(static_cast<double> (document_count_) / term_frequency_.at(word).size());
+    }
     vector<Document> FindAllDocuments(Query &query) const {
         map<int, double> document_relevance_buf;
         vector<Document> matched_documents;
@@ -141,7 +140,7 @@ private:
                 continue;
             }
 
-            double word_idf = log(static_cast<double> (document_count_) / term_frequency_.at(word).size());
+            double word_idf = CalcIDF(word);
             for (auto [document_id, tf]: term_frequency_.at(word)) {
                 document_relevance_buf[document_id] += word_idf * tf;
             }
