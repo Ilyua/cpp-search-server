@@ -11,6 +11,7 @@
 using namespace std;
 
 const int MAX_RESULT_DOCUMENT_COUNT = 5;
+const double EPS = 0.0001;
 
 string ReadLine() {
     string s;
@@ -207,7 +208,7 @@ private:
         return query;
     }
 
-    // Existence required
+    
     double ComputeWordInverseDocumentFreq(const string& word) const {
         return log(GetDocumentCount() * 1.0 / word_to_document_freqs_.at(word).size());
     }
@@ -220,7 +221,7 @@ private:
             }
             const double inverse_document_freq = ComputeWordInverseDocumentFreq(word);
             for (const auto [document_id, term_freq] : word_to_document_freqs_.at(word)) {
-                if (predicat(document_id,documents_.at(document_id).status,documents_.at(document_id).rating)) {
+                if (predicat(document_id, documents_.at(document_id).status, documents_.at(document_id).rating)) {
                     document_to_relevance[document_id] += term_freq * inverse_document_freq;
                 }
             }
@@ -293,7 +294,7 @@ void PrintDocument(const Document& document) {
  #define ASSERT_HINT(expr, hint) AssertImpl(!!(expr), #expr, __FILE__, __FUNCTION__, __LINE__, (hint))
 
 template <typename t>
-void RunTestImpl(t func,string func_s) {
+void RunTestImpl(t func, string func_s) {
     func();
     cerr<<func_s<<" OK"<<endl;
 }
@@ -312,7 +313,9 @@ void TestAddDocument()
     
     {
         SearchServer server;
+        ASSERT_EQUAL(server.GetDocumentCount(),0);
         server.AddDocument(doc_id, content, DocumentStatus::ACTUAL, ratings);
+        ASSERT_EQUAL(server.GetDocumentCount(),1);
         const auto found_docs = server.FindTopDocuments("cat in the city"s);
         ASSERT_EQUAL(found_docs.size(), 1);
         const Document& doc0 = found_docs[0];
@@ -321,20 +324,7 @@ void TestAddDocument()
 }
  
 
-void TestStopWords()
-{
-    const int doc_id = 42;
-    const string content = "cat in the city"s;
-    const vector<int> ratings = { 1, 2, 3 };
- 
-    {
-        SearchServer server;
-        server.SetStopWords("in the"s);
-        server.AddDocument(doc_id, content, DocumentStatus::ACTUAL, ratings);
-        ASSERT(server.FindTopDocuments("in"s).empty());
-    }
- 
-}
+
  
 
 void TestMinusWords()
@@ -352,6 +342,14 @@ void TestMinusWords()
         ASSERT_EQUAL(doc0.id , doc_id);
     }
  
+    {
+        SearchServer server;
+        server.AddDocument(doc_id, "cat in the city"s, DocumentStatus::ACTUAL, ratings);
+        server.AddDocument(doc_id+1, "cat at the city"s, DocumentStatus::ACTUAL, ratings);
+        ASSERT_EQUAL(server.FindTopDocuments("cat -in"s).size(),1);
+        
+        
+    }
     
     {
         SearchServer server;
@@ -372,9 +370,11 @@ void TestMatchedDocuments()
         {
             
             const auto& [words, status] = server.MatchDocument("fluffy cat"s, document_id);
+            
             ASSERT_EQUAL(words.size() , 1);
+            ASSERT_EQUAL(words[0], "cat"s);
             ASSERT_EQUAL(document_id , 0);
-            ASSERT_EQUAL(status , DocumentStatus::ACTUAL);
+            ASSERT_EQUAL(status, DocumentStatus::ACTUAL);
         }
     }
     
@@ -413,11 +413,7 @@ void TestSortFindedDocumentsByRelevance()
 {
     {
         SearchServer server;
- 
-        
-        
-        
-       
+
         server.AddDocument(0, "white cat and fancy collar"s, DocumentStatus::ACTUAL, { 8, -3 });
         server.AddDocument(1, "fluffy cat fluffy tail"s, DocumentStatus::ACTUAL, { 7, 2, 7 });
         server.AddDocument(2, "soigne dog expressive eyes"s, DocumentStatus::ACTUAL, { 5, -12, 2 });
@@ -425,10 +421,11 @@ void TestSortFindedDocumentsByRelevance()
  
         const auto& documents = server.FindTopDocuments("fluffy soigne cat"s);
  
-       
-        for (int i = 0; i < (documents.size() - 1); ++i)
+        auto prev = documents[0].relevance;
+        for (int i = 1; i < documents.size(); ++i)
         {
-            ASSERT(documents[i].relevance > documents[i + 1].relevance);
+            ASSERT(documents[i].relevance < prev);
+            prev = documents[i].relevance;
         }
     }
  
@@ -436,29 +433,96 @@ void TestSortFindedDocumentsByRelevance()
 }
  
 
-void TestRatingsAndStatus()
+void TestRatings()
 {
-    
+        
         SearchServer server;
-         server.SetStopWords(" is are was a an in the with near at"s);
-        server.AddDocument(0, "a colorful parrot with green wings and red tail is lost"s, DocumentStatus::ACTUAL, { 8,2  });
-        server.AddDocument(1, "a grey hound with black ears is found at the railway station"s, DocumentStatus::ACTUAL, { 8,2 });
-        server.AddDocument(2, "a white cat with long furry tail is found near the red square"s, DocumentStatus::ACTUAL, { 8,2 });
+        int rating_one = 8;
+        int rating_two = 2;
+        server.SetStopWords(" is are was a an in the with near at"s);
+        server.AddDocument(0, "a colorful parrot with green wings and red tail is lost"s, DocumentStatus::ACTUAL, {rating_one, rating_two});
+        server.AddDocument(1, "a grey hound with black ears is found at the railway station"s, DocumentStatus::ACTUAL, {rating_one, rating_two});
+        server.AddDocument(2, "a white cat with long furry tail is found near the red square"s, DocumentStatus::ACTUAL, {rating_one, rating_two});
         
  
         const auto& documents = server.FindTopDocuments("white cat long tail"s);
-        vector<double> rel;
-        vector<double> r;
+        vector<double> relevances;
+        vector<double> ratings;
         for (auto doc: documents){
-            rel.push_back(doc.relevance);
-            r.push_back(doc.rating);
+            
+            ratings.push_back(doc.rating);
         }
-        ASSERT(abs(rel[0]-0.462663) < 0.0001);
-        ASSERT(abs(rel[1]-0.0506831) < 0.0001);
-        ASSERT(abs(r[0]-5)< 0.0001);
-        ASSERT(abs(r[1]-5)< 0.0001);
+       
+        ASSERT_EQUAL(ratings[0],(rating_one + rating_two) / 2);
+        ASSERT_EQUAL(ratings[1],(rating_one + rating_two) / 2);
         
     }
+
+void TestRelevances()
+{
+        
+        SearchServer server;
+    
+        server.SetStopWords(" cat cat cat"s);
+        server.AddDocument(0, "dog dog dog"s, DocumentStatus::ACTUAL, {8, 2});
+        server.AddDocument(1, "parrot parrot parrot"s, DocumentStatus::ACTUAL, {8, 2});
+        
+        const auto& documents = server.FindTopDocuments("parrot parrot parrot"s);
+        vector<double> relevances;
+        vector<double> ratings;
+        
+        for (auto doc: documents){
+            relevances.push_back(doc.relevance);
+           
+        }
+        ASSERT_EQUAL(relevances.size(),1);
+        ASSERT(abs(relevances[0] - log(server.GetDocumentCount() * 1.0 / 1)) < EPS);
+        
+
+        
+    }
+
+void TestSearchByStatus()
+{
+    SearchServer server;
+    
+    server.SetStopWords(" is are was a an in the with near at"s);
+    server.AddDocument(0, "dog dog"s, DocumentStatus::ACTUAL, {8, 2});
+    server.AddDocument(1, "dog"s, DocumentStatus::ACTUAL, {8, 2});
+    server.AddDocument(2, "cat"s, DocumentStatus::BANNED, {8, 2});
+    
+    {
+        const auto& documents = server.FindTopDocuments("cat"s);
+        ASSERT_EQUAL(documents.size(),0);
+    }
+    {
+        const auto& documents = server.FindTopDocuments("dog"s);
+        ASSERT_EQUAL(documents.size(),2);
+        
+    }
+}
+void TestSearchByPredicat()
+{
+    SearchServer server;
+    
+    server.SetStopWords(" is are was a an in the with near at"s);
+    server.AddDocument(0, "cat"s, DocumentStatus::ACTUAL, {0});
+    server.AddDocument(1, "cat"s, DocumentStatus::ACTUAL, {5});
+    server.AddDocument(2, "cat"s, DocumentStatus::ACTUAL, {10});
+    
+    {
+        const auto& documents = server.FindTopDocuments("cat"s,[](int document_id,DocumentStatus status,double rating){
+            return rating > 5;
+        });
+        ASSERT_EQUAL(documents.size(),1);
+    }
+    {
+        const auto& documents = server.FindTopDocuments("cat"s,[](int document_id,DocumentStatus status,double rating){
+            return rating > 2;
+        });
+        ASSERT_EQUAL(documents.size(),2);
+    }
+}
 
 void TestExcludeStopWordsFromAddedDocumentContent() {
     const int doc_id = 42;
@@ -468,7 +532,7 @@ void TestExcludeStopWordsFromAddedDocumentContent() {
         SearchServer server;
         server.AddDocument(doc_id, content, DocumentStatus::ACTUAL, ratings);
         const auto found_docs = server.FindTopDocuments("in"s);
-        ASSERT_EQUAL(found_docs.size(), 1u);
+        ASSERT_EQUAL(found_docs.size(), 1);
         const Document& doc0 = found_docs[0];
         ASSERT_EQUAL(doc0.id, doc_id);
     }
@@ -483,25 +547,22 @@ void TestExcludeStopWordsFromAddedDocumentContent() {
 }
 
 
-
-
 void TestSearchServer() {
     RUN_TEST(TestExcludeStopWordsFromAddedDocumentContent);
     RUN_TEST(TestAddDocument);
-    RUN_TEST(TestStopWords);
     RUN_TEST(TestMinusWords);
     RUN_TEST(TestMatchedDocuments);
     RUN_TEST(TestSortFindedDocumentsByRelevance);
-    RUN_TEST(TestRatingsAndStatus);
+    RUN_TEST(TestRatings);
+    RUN_TEST(TestRelevances);
     RUN_TEST(TestExcludeStopWordsFromAddedDocumentContent);
-   
-    // Не забудьте вызывать остальные тесты здесь
+    RUN_TEST(TestSearchByStatus);
+    RUN_TEST(TestSearchByPredicat);
 }
 
 // --------- Окончание модульных тестов поисковой системы -----------
 
 int main() {
     TestSearchServer();
-    // Если вы видите эту строку, значит все тесты прошли успешно
     cout << "Search server testing finished"s << endl;
 }
