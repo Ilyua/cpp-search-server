@@ -7,11 +7,8 @@
 #include <vector>
 #include <iostream>
 
-//#include "search_server.h"
 
 using namespace std;
-
-
 
 const int MAX_RESULT_DOCUMENT_COUNT = 5;
 
