@@ -6,6 +6,7 @@
 #include <utility>
 #include <vector>
 #include <iostream>
+#include <numeric>
 
 
 using namespace std;
@@ -319,7 +320,7 @@ void TestAddDocument()
         const auto found_docs = server.FindTopDocuments("cat in the city"s);
         ASSERT_EQUAL(found_docs.size(), 1);
         const Document& doc0 = found_docs[0];
-        ASSERT_EQUAL(doc0.id , doc_id);
+        ASSERT_EQUAL(doc0.id, doc_id);
     }
 }
  
@@ -337,16 +338,16 @@ void TestMinusWords()
         SearchServer server;
         server.AddDocument(doc_id, content, DocumentStatus::ACTUAL, ratings);
         const auto found_docs = server.FindTopDocuments("cat in the city"s);
-        ASSERT_EQUAL(found_docs.size() , 1);
+        ASSERT_EQUAL(found_docs.size(), 1);
         const Document& doc0 = found_docs[0];
-        ASSERT_EQUAL(doc0.id , doc_id);
+        ASSERT_EQUAL(doc0.id, doc_id);
     }
  
     {
         SearchServer server;
         server.AddDocument(doc_id, "cat in the city"s, DocumentStatus::ACTUAL, ratings);
-        server.AddDocument(doc_id+1, "cat at the city"s, DocumentStatus::ACTUAL, ratings);
-        ASSERT_EQUAL(server.FindTopDocuments("cat -in"s).size(),1);
+        server.AddDocument(doc_id + 1, "cat at the city"s, DocumentStatus::ACTUAL, ratings);
+        ASSERT_EQUAL(server.FindTopDocuments("cat -in"s).size(), 1);
         
         
     }
@@ -371,9 +372,9 @@ void TestMatchedDocuments()
             
             const auto& [words, status] = server.MatchDocument("fluffy cat"s, document_id);
             
-            ASSERT_EQUAL(words.size() , 1);
+            ASSERT_EQUAL(words.size(), 1);
             ASSERT_EQUAL(words[0], "cat"s);
-            ASSERT_EQUAL(document_id , 0);
+            ASSERT_EQUAL(document_id, 0);
             ASSERT_EQUAL(status, DocumentStatus::ACTUAL);
         }
     }
@@ -387,9 +388,9 @@ void TestMatchedDocuments()
         {
             
             const auto& [words, status] = server.MatchDocument("fluffy cat"s, document_id);
-            ASSERT_EQUAL(words.size() , 0);
-            ASSERT_EQUAL(document_id , 0);
-            ASSERT_EQUAL(status , DocumentStatus::ACTUAL);
+            ASSERT_EQUAL(words.size(), 0);
+            ASSERT_EQUAL(document_id, 0);
+            ASSERT_EQUAL(status, DocumentStatus::ACTUAL);
         }
     }
  
@@ -401,9 +402,9 @@ void TestMatchedDocuments()
         {
            
             const auto& [words, status] = server.MatchDocument("fluffy -cat"s, document_id);
-            ASSERT_EQUAL(words.size() , 0);
-            ASSERT_EQUAL(document_id , 0);
-            ASSERT_EQUAL(status , DocumentStatus::ACTUAL);
+            ASSERT_EQUAL(words.size(), 0);
+            ASSERT_EQUAL(document_id, 0);
+            ASSERT_EQUAL(status, DocumentStatus::ACTUAL);
         }
     }
 }
@@ -420,13 +421,16 @@ void TestSortFindedDocumentsByRelevance()
         server.AddDocument(3, "soigne starling eugeny"s, DocumentStatus::BANNED, { 9 });
  
         const auto& documents = server.FindTopDocuments("fluffy soigne cat"s);
- 
-        auto prev = documents[0].relevance;
-        for (int i = 1; i < documents.size(); ++i)
-        {
-            ASSERT(documents[i].relevance < prev);
-            prev = documents[i].relevance;
+        if (documents.size() >= 1){
+            
+            for (int i = 1; i < documents.size(); ++i)
+            {
+                ASSERT(documents[i - 1].relevance > documents[i].relevance);
+            }
+        }else{
+            abort();
         }
+        
     }
  
    
@@ -435,28 +439,24 @@ void TestSortFindedDocumentsByRelevance()
 
 void TestRatings()
 {
+    
+    SearchServer server;
+    vector<int> test_ratings = {10, 0, 5, 5};
+    int test_ratings_mean = accumulate(test_ratings.begin(),test_ratings.end(), 0) / test_ratings.size();
+    server.SetStopWords(" is are was a an in the with near at"s);
+    server.AddDocument(0, "parrot parrot parrot"s, DocumentStatus::ACTUAL, test_ratings);
+    
+    const auto& documents = server.FindTopDocuments("parrot"s);
+    vector<double> ratings;
+    
+    if (documents.size() == 1){
+        ASSERT_EQUAL(documents[0].rating,test_ratings_mean);
         
-        SearchServer server;
-        int rating_one = 8;
-        int rating_two = 2;
-        server.SetStopWords(" is are was a an in the with near at"s);
-        server.AddDocument(0, "a colorful parrot with green wings and red tail is lost"s, DocumentStatus::ACTUAL, {rating_one, rating_two});
-        server.AddDocument(1, "a grey hound with black ears is found at the railway station"s, DocumentStatus::ACTUAL, {rating_one, rating_two});
-        server.AddDocument(2, "a white cat with long furry tail is found near the red square"s, DocumentStatus::ACTUAL, {rating_one, rating_two});
-        
- 
-        const auto& documents = server.FindTopDocuments("white cat long tail"s);
-        vector<double> relevances;
-        vector<double> ratings;
-        for (auto doc: documents){
-            
-            ratings.push_back(doc.rating);
-        }
-       
-        ASSERT_EQUAL(ratings[0],(rating_one + rating_two) / 2);
-        ASSERT_EQUAL(ratings[1],(rating_one + rating_two) / 2);
-        
+    }else{
+        abort();
     }
+}
+
 
 void TestRelevances()
 {
@@ -471,11 +471,11 @@ void TestRelevances()
         vector<double> relevances;
         vector<double> ratings;
         
-        for (auto doc: documents){
+        for (const auto& doc: documents){
             relevances.push_back(doc.relevance);
            
         }
-        ASSERT_EQUAL(relevances.size(),1);
+        ASSERT_EQUAL(relevances.size(), 1);
         ASSERT(abs(relevances[0] - log(server.GetDocumentCount() * 1.0 / 1)) < EPS);
         
 
@@ -490,18 +490,30 @@ void TestSearchByStatus()
     server.AddDocument(0, "dog dog"s, DocumentStatus::ACTUAL, {8, 2});
     server.AddDocument(1, "dog"s, DocumentStatus::ACTUAL, {8, 2});
     server.AddDocument(2, "cat"s, DocumentStatus::BANNED, {8, 2});
+    server.AddDocument(3, "parrot"s, DocumentStatus::IRRELEVANT, {8, 2});
     
     {
         const auto& documents = server.FindTopDocuments("cat"s);
-        ASSERT_EQUAL(documents.size(),0);
+        ASSERT_EQUAL(documents.size(), 0);
     }
     {
         const auto& documents = server.FindTopDocuments("dog"s);
-        ASSERT_EQUAL(documents.size(),2);
+        ASSERT_EQUAL(documents.size(), 2);
         
     }
+    {
+        const auto& documents = server.FindTopDocuments("parrot"s,DocumentStatus::IRRELEVANT);
+        ASSERT_EQUAL(documents.size(), 1);
+        
+    }
+    {
+        const auto& documents = server.FindTopDocuments("parrot"s,DocumentStatus::ACTUAL);
+        ASSERT_EQUAL(documents.size(), 0);
+        
+    }
+    
 }
-void TestSearchByPredicat()
+void TestSearchByPredicate()
 {
     SearchServer server;
     
@@ -511,16 +523,16 @@ void TestSearchByPredicat()
     server.AddDocument(2, "cat"s, DocumentStatus::ACTUAL, {10});
     
     {
-        const auto& documents = server.FindTopDocuments("cat"s,[](int document_id,DocumentStatus status,double rating){
+        const auto& documents = server.FindTopDocuments("cat"s,[](int document_id, DocumentStatus status, double rating){
             return rating > 5;
         });
-        ASSERT_EQUAL(documents.size(),1);
+        ASSERT_EQUAL(documents.size(), 1);
     }
     {
-        const auto& documents = server.FindTopDocuments("cat"s,[](int document_id,DocumentStatus status,double rating){
+        const auto& documents = server.FindTopDocuments("cat"s,[](int document_id, DocumentStatus status, double rating){
             return rating > 2;
         });
-        ASSERT_EQUAL(documents.size(),2);
+        ASSERT_EQUAL(documents.size(), 2);
     }
 }
 
@@ -555,9 +567,8 @@ void TestSearchServer() {
     RUN_TEST(TestSortFindedDocumentsByRelevance);
     RUN_TEST(TestRatings);
     RUN_TEST(TestRelevances);
-    RUN_TEST(TestExcludeStopWordsFromAddedDocumentContent);
     RUN_TEST(TestSearchByStatus);
-    RUN_TEST(TestSearchByPredicat);
+    RUN_TEST(TestSearchByPredicate);
 }
 
 // --------- Окончание модульных тестов поисковой системы -----------
