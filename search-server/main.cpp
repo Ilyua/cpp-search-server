@@ -94,11 +94,11 @@ public:
     {
     }
 
-    inline static constexpr int INVALID_DOCUMENT_ID = -1;
+    
 
     int GetDocumentId(int index)
     {
-        return idsIn.at(index);
+        return index_to_id.at(index);
     }
 
     void AddDocument(int document_id, const string &document,
@@ -116,27 +116,26 @@ public:
         {
             throw invalid_argument("document containse resticted symbols"s);
         }
-        else
+        
+        const vector<string> words = SplitIntoWordsNoStop(document);
+        const double inv_word_count = 1.0 / words.size();
+        for (const string &word : words)
         {
-            const vector<string> words = SplitIntoWordsNoStop(document);
-            const double inv_word_count = 1.0 / words.size();
-            for (const string &word : words)
-            {
-                word_to_document_freqs_[word][document_id] += inv_word_count;
-            }
-            documents_.emplace(document_id, DocumentData{ComputeAverageRating(ratings), status});
-            idsIn.push_back(document_id);
+            word_to_document_freqs_[word][document_id] += inv_word_count;
         }
+        documents_.emplace(document_id, DocumentData{ComputeAverageRating(ratings), status});
+        index_to_id.push_back(document_id);
+        
     }
 
-    template <typename Func>
+    template <typename Predicate>
     vector<Document> FindTopDocuments(const string &raw_query,
-                                      Func predicat) const
+                                      Predicate predicate) const
     {
 
         Query query = ParseQuery(raw_query);
 
-        vector<Document> result = FindAllDocuments(query, predicat);
+        vector<Document> result = FindAllDocuments(query, predicate);
 
         sort(result.begin(), result.end(),
              [](const Document &lhs, const Document &rhs)
@@ -215,7 +214,7 @@ private:
     set<string> stop_words_;
     map<string, map<int, double>> word_to_document_freqs_;
     map<int, DocumentData> documents_;
-    vector<int> idsIn;
+    vector<int> index_to_id;
 
     bool IsValidWord(const string &word) const
     {
@@ -297,11 +296,11 @@ private:
         }
         else
         {
-            if ((text[0] == '-') && (text.size() == 1))
+            if ((text.size() == 1) && (text[0] == '-') )
             {
                 throw invalid_argument("Search word consists of one minus");
             }
-            if ((text[0] == '-') && (text.size() > 1) && (text[1] == '-'))
+            if ( (text.size() > 1) && (text[0] == '-')  && (text[1] == '-'))
             {
                 throw invalid_argument("Two minuses before word"s);
             }
@@ -370,8 +369,8 @@ private:
     {
         return log(GetDocumentCount() * 1.0 / word_to_document_freqs_.at(word).size());
     }
-    template <typename Func>
-    vector<Document> FindAllDocuments(const Query &query, Func predicat) const
+    template <typename Predicate>
+    vector<Document> FindAllDocuments(const Query &query, Predicate predicate) const
     {
         map<int, double> document_to_relevance;
         for (const string &word : query.plus_words)
@@ -383,7 +382,7 @@ private:
             const double inverse_document_freq = ComputeWordInverseDocumentFreq(word);
             for (const auto [document_id, term_freq] : word_to_document_freqs_.at(word))
             {
-                if (predicat(document_id, documents_.at(document_id).status, documents_.at(document_id).rating))
+                if (predicate(document_id, documents_.at(document_id).status, documents_.at(document_id).rating))
                 {
                     document_to_relevance[document_id] += term_freq * inverse_document_freq;
                 }
