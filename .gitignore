@@ -1,4 +1,8 @@
+.vscode
+main
+main.dSYM
 build
+out
 .DS_Store
 .idea
 # Prerequisites

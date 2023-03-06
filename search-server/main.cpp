@@ -7,7 +7,9 @@
 #include <vector>
 #include <iostream>
 #include <numeric>
+#include <deque>
 
+#include "document.h"
 using namespace std;
 
 const int MAX_RESULT_DOCUMENT_COUNT = 5;
@@ -28,27 +30,6 @@ int ReadLineWithNumber()
     return result;
 }
 
-struct Document
-{
-    Document() = default;
-
-    Document(int id, double relevance, int rating)
-        : id(id), relevance(relevance), rating(rating)
-    {
-    }
-
-    int id = 0;
-    double relevance = 0.0;
-    int rating = 0;
-};
-
-enum class DocumentStatus
-{
-    ACTUAL,
-    IRRELEVANT,
-    BANNED,
-    REMOVED,
-};
 ostream &operator<<(ostream &out, const DocumentStatus &status)
 {
 
@@ -94,8 +75,6 @@ public:
     {
     }
 
-    
-
     int GetDocumentId(int index)
     {
         return index_to_id.at(index);
@@ -116,7 +95,7 @@ public:
         {
             throw invalid_argument("document containse resticted symbols"s);
         }
-        
+
         const vector<string> words = SplitIntoWordsNoStop(document);
         const double inv_word_count = 1.0 / words.size();
         for (const string &word : words)
@@ -125,7 +104,6 @@ public:
         }
         documents_.emplace(document_id, DocumentData{ComputeAverageRating(ratings), status});
         index_to_id.push_back(document_id);
-        
     }
 
     template <typename Predicate>
@@ -296,11 +274,11 @@ private:
         }
         else
         {
-            if ((text.size() == 1) && (text[0] == '-') )
+            if ((text.size() == 1) && (text[0] == '-'))
             {
                 throw invalid_argument("Search word consists of one minus");
             }
-            if ( (text.size() > 1) && (text[0] == '-')  && (text[1] == '-'))
+            if ((text.size() > 1) && (text[0] == '-') && (text[1] == '-'))
             {
                 throw invalid_argument("Two minuses before word"s);
             }
@@ -708,8 +686,155 @@ void TestSearchServer()
 
 // --------- Окончание модульных тестов поисковой системы -----------
 
+template <typename It>
+struct IteratorRange
+{
+    It begin;
+    It end;
+
+    int size()
+    {
+        return end - begin;
+    }
+};
+
+template <typename It>
+class Paginator
+{
+public:
+    vector<IteratorRange<It>> pages;
+    size_t step;
+    size_t diff;
+    explicit Paginator(It begin, It end, size_t size)
+    {
+        It iter = begin;
+        while (distance(iter, end) > 0)
+        {
+            diff = distance(iter, end);
+            step = min(diff, size);
+            auto new_begin = iter;
+            advance(iter, step);
+
+            IteratorRange<It> range = {new_begin,
+                                       iter};
+            pages.push_back(range);
+        }
+    }
+
+    auto begin() const
+    {
+        return pages.begin();
+    }
+    auto end() const
+    {
+        return pages.end();
+    }
+};
+
+template <typename Iterator>
+ostream &operator<<(ostream &out, const IteratorRange<Iterator> &It)
+{
+    for (auto i = It.begin; i != It.end; ++i)
+        out << *i;
+    return out;
+}
+
+template <typename Container>
+auto Paginate(const Container &c, size_t page_size)
+{
+    Paginator p(begin(c), end(c), page_size);
+    return p;
+}
+
+class RequestQueue
+{
+public:
+    explicit RequestQueue(const SearchServer &search_server) : server_(search_server)
+    {
+    }
+    // сделаем "обёртки" для всех методов поиска, чтобы сохранять результаты для нашей статистики
+    template <typename DocumentPredicate>
+    vector<Document> AddFindRequest(const string &raw_query, DocumentPredicate document_predicate)
+    {
+        vector<Document> temp = server_.FindTopDocuments(raw_query, document_predicate);
+        QueryResult temp_query;
+        temp_query.count_documents = temp.size();
+        AddQueryResult(temp_query);
+        return temp;
+    }
+    vector<Document> AddFindRequest(const string &raw_query, DocumentStatus status)
+    {
+        vector<Document> temp = server_.FindTopDocuments(raw_query, status);
+        QueryResult temp_query;
+        temp_query.count_documents = temp.size();
+        AddQueryResult(temp_query);
+        return temp;
+    }
+    vector<Document> AddFindRequest(const string &raw_query)
+    {
+        vector<Document> temp = server_.FindTopDocuments(raw_query);
+        QueryResult temp_query;
+        temp_query.count_documents = temp.size();
+        AddQueryResult(temp_query);
+        return temp;
+    }
+
+    int GetNoResultRequests() const
+    {
+        return count_;
+    }
+
+private:
+    struct QueryResult
+    {
+        unsigned long count_documents;
+    };
+
+    void AddQueryResult(const QueryResult &query)
+    {
+        if (requests_.size() >= min_in_day_)
+        {
+            QueryResult results = requests_.front();
+            requests_.pop_front();
+            if (results.count_documents == 0)
+            {
+                count_--;
+            }
+        }
+        if (query.count_documents == 0)
+        {
+            count_++;
+        }
+        requests_.push_back(query);
+    }
+
+    deque<QueryResult> requests_;
+    const static int min_in_day_ = 1440;
+    const SearchServer &server_;
+    int count_ = 0;
+};
+
 int main()
 {
     TestSearchServer();
-    cout << "Search server testing finished"s << endl;
+    SearchServer search_server("and in at"s);
+    RequestQueue request_queue(search_server);
+    search_server.AddDocument(1, "curly cat curly tail"s, DocumentStatus::ACTUAL, {7, 2, 7});
+    search_server.AddDocument(2, "curly dog and fancy collar"s, DocumentStatus::ACTUAL, {1, 2, 3});
+    search_server.AddDocument(3, "big cat fancy collar "s, DocumentStatus::ACTUAL, {1, 2, 8});
+    search_server.AddDocument(4, "big dog sparrow Eugene"s, DocumentStatus::ACTUAL, {1, 3, 2});
+    search_server.AddDocument(5, "big dog sparrow Vasiliy"s, DocumentStatus::ACTUAL, {1, 1, 1});
+    // 1439 запросов с нулевым результатом
+    for (int i = 0; i < 1439; ++i)
+    {
+        request_queue.AddFindRequest("empty request"s);
+    }
+    // все еще 1439 запросов с нулевым результатом
+    request_queue.AddFindRequest("curly dog"s);
+    // новые сутки, первый запрос удален, 1438 запросов с нулевым результатом
+    request_queue.AddFindRequest("big collar"s);
+    // первый запрос удален, 1437 запросов с нулевым результатом
+    request_queue.AddFindRequest("sparrow"s);
+    cout << "Total empty requests: "s << request_queue.GetNoResultRequests() << endl;
+    return 0;
 }
