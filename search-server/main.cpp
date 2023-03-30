@@ -15,7 +15,6 @@
 #include "paginator.h"
 #include "read_input_functions.h"
 
-
 using namespace std;
 
 // ==================== для примера =========================

@@ -2,7 +2,6 @@
 
 #include <iostream>
 #include <vector>
-#include "document.h"
 
 
 
@@ -17,11 +16,6 @@ struct IteratorRange
         return end - begin;
     }
 };
-
-
-
- // не могу выносить метод шаблонного класса? 
- // реализация шаблона не компилируется
 
 
 
