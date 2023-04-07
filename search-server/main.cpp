@@ -17,20 +17,17 @@
 
 using namespace std;
 
-// ==================== для примера =========================
 
-template <typename T, typename U>
+
+template<typename T, typename U>
 void AssertEqualImpl(const T &t, const U &u, const string &t_str, const string &u_str, const string &file,
-                     const string &func, unsigned line, const string &hint)
-{
-    if (t != u)
-    {
+                     const string &func, unsigned line, const string &hint) {
+    if (t != u) {
         cout << boolalpha;
         cout << file << "("s << line << "): "s << func << ": "s;
         cout << "ASSERT_EQUAL("s << t_str << ", "s << u_str << ") failed: "s;
         cout << t << " != "s << u << "."s;
-        if (!hint.empty())
-        {
+        if (!hint.empty()) {
             cout << " Hint: "s << hint;
         }
         cout << endl;
@@ -43,14 +40,11 @@ void AssertEqualImpl(const T &t, const U &u, const string &t_str, const string &
 #define ASSERT_EQUAL_HINT(a, b, hint) AssertEqualImpl((a), (b), #a, #b, __FILE__, __FUNCTION__, __LINE__, (hint))
 
 void AssertImpl(bool value, const string &expr_str, const string &file, const string &func, unsigned line,
-                const string &hint)
-{
-    if (!value)
-    {
+                const string &hint) {
+    if (!value) {
         cout << file << "("s << line << "): "s << func << ": "s;
         cout << "ASSERT("s << expr_str << ") failed."s;
-        if (!hint.empty())
-        {
+        if (!hint.empty()) {
             cout << " Hint: "s << hint;
         }
         cout << endl;
@@ -62,9 +56,8 @@ void AssertImpl(bool value, const string &expr_str, const string &file, const st
 
 #define ASSERT_HINT(expr, hint) AssertImpl(!!(expr), #expr, __FILE__, __FUNCTION__, __LINE__, (hint))
 
-template <typename t>
-void RunTestImpl(t func, string func_s)
-{
+template<typename t>
+void RunTestImpl(t func, string func_s) {
     func();
     cerr << func_s << " OK" << endl;
 }
@@ -73,8 +66,7 @@ void RunTestImpl(t func, string func_s)
 
 // -------- Начало модульных тестов поисковой системы ----------
 
-void TestAddDocument()
-{
+void TestAddDocument() {
     const int doc_id = 42;
     const string content = "cat in the city"s;
     const vector<int> ratings = {1, 2, 3};
@@ -91,8 +83,7 @@ void TestAddDocument()
     }
 }
 
-void TestMinusWords()
-{
+void TestMinusWords() {
     const int doc_id = 42;
     const string content = "cat in the city"s;
     const vector<int> ratings = {1, 2, 3};
@@ -120,14 +111,12 @@ void TestMinusWords()
     }
 }
 
-void TestMatchedDocuments()
-{
+void TestMatchedDocuments() {
     {
         SearchServer server("и в на"s);
         server.AddDocument(0, "white cat and fancy collar"s, DocumentStatus::ACTUAL, {1, 2, -3});
         const int document_count = server.GetDocumentCount();
-        for (int document_id = 0; document_id < document_count; ++document_id)
-        {
+        for (int document_id = 0; document_id < document_count; ++document_id) {
 
             const auto &[words, status] = server.MatchDocument("fluffy cat"s, document_id);
 
@@ -143,8 +132,7 @@ void TestMatchedDocuments()
 
         server.AddDocument(0, "white cat and fancy collar"s, DocumentStatus::ACTUAL, {1, 2, -3});
         const int document_count = server.GetDocumentCount();
-        for (int document_id = 0; document_id < document_count; ++document_id)
-        {
+        for (int document_id = 0; document_id < document_count; ++document_id) {
 
             const auto &[words, status] = server.MatchDocument("fluffy cat"s, document_id);
             ASSERT_EQUAL(words.size(), 0);
@@ -157,8 +145,7 @@ void TestMatchedDocuments()
         SearchServer server("и в на"s);
         server.AddDocument(0, "white cat and fancy collar"s, DocumentStatus::ACTUAL, {1, 2, -3});
         const int document_count = server.GetDocumentCount();
-        for (int document_id = 0; document_id < document_count; ++document_id)
-        {
+        for (int document_id = 0; document_id < document_count; ++document_id) {
 
             const auto &[words, status] = server.MatchDocument("fluffy -cat"s, document_id);
             ASSERT_EQUAL(words.size(), 0);
@@ -168,8 +155,7 @@ void TestMatchedDocuments()
     }
 }
 
-void TestSortFindedDocumentsByRelevance()
-{
+void TestSortFindedDocumentsByRelevance() {
     {
         SearchServer server("и в на"s);
 
@@ -180,15 +166,13 @@ void TestSortFindedDocumentsByRelevance()
 
         const auto &documents = server.FindTopDocuments("fluffy soigne cat"s);
 
-        for (unsigned int i = 1; i < documents.size(); ++i)
-        {
+        for (unsigned int i = 1; i < documents.size(); ++i) {
             ASSERT(documents[i - 1].relevance > documents[i].relevance);
         }
     }
 }
 
-void TestRatings()
-{
+void TestRatings() {
 
     SearchServer server(" is are was a an in the with near at"s);
     vector<int> test_ratings = {10, 0, 5, 5};
@@ -204,8 +188,7 @@ void TestRatings()
     ASSERT_EQUAL(documents[0].rating, test_ratings_mean);
 }
 
-void TestRelevances()
-{
+void TestRelevances() {
 
     SearchServer server(" cat cat cat"s);
 
@@ -216,16 +199,14 @@ void TestRelevances()
     vector<double> relevances;
     vector<double> ratings;
 
-    for (const auto &doc : documents)
-    {
+    for (const auto &doc: documents) {
         relevances.push_back(doc.relevance);
     }
     ASSERT_EQUAL(relevances.size(), 1);
     ASSERT(std::abs(relevances[0] - std::log(server.GetDocumentCount() * 1.0 / 1)) < EPS);
 }
 
-void TestSearchByStatus()
-{
+void TestSearchByStatus() {
     SearchServer server(" is are was a an in the with near at"s);
 
     server.AddDocument(0, "dog dog"s, DocumentStatus::ACTUAL, {8, 2});
@@ -242,8 +223,8 @@ void TestSearchByStatus()
         ASSERT_EQUAL(documents.size(), 0);
     }
 }
-void TestSearchByPredicate()
-{
+
+void TestSearchByPredicate() {
     SearchServer server(" is are was a an in the with near at"s);
 
     server.AddDocument(0, "cat"s, DocumentStatus::ACTUAL, {0});
@@ -251,19 +232,20 @@ void TestSearchByPredicate()
     server.AddDocument(2, "cat"s, DocumentStatus::ACTUAL, {10});
 
     {
-        const auto &documents = server.FindTopDocuments("cat"s, []([[maybe_unused]] int document_id, [[maybe_unused]] DocumentStatus status, double rating)
-                                                        { return rating > 5; });
+        const auto &documents = server.FindTopDocuments("cat"s, []([[maybe_unused]] int document_id,
+                                                                   [[maybe_unused]] DocumentStatus status,
+                                                                   double rating) { return rating > 5; });
         ASSERT_EQUAL(documents.size(), 1);
     }
     {
-        const auto &documents = server.FindTopDocuments("cat"s, []([[maybe_unused]] int document_id, [[maybe_unused]] DocumentStatus status, double rating)
-                                                        { return rating > 2; });
+        const auto &documents = server.FindTopDocuments("cat"s, []([[maybe_unused]] int document_id,
+                                                                   [[maybe_unused]] DocumentStatus status,
+                                                                   double rating) { return rating > 2; });
         ASSERT_EQUAL(documents.size(), 2);
     }
 }
 
-void TestExcludeStopWordsFromAddedDocumentContent()
-{
+void TestExcludeStopWordsFromAddedDocumentContent() {
     const int doc_id = 42;
     const string content = "cat in the city"s;
     const vector<int> ratings = {1, 2, 3};
@@ -284,15 +266,12 @@ void TestExcludeStopWordsFromAddedDocumentContent()
 
     {
         SearchServer server("in the"s);
-
         server.AddDocument(doc_id, content, DocumentStatus::ACTUAL, ratings);
-        ASSERT_HINT(server.FindTopDocuments("in"s).empty(),
-                    "Stop words must be excluded from documents"s);
+        ASSERT_HINT(server.FindTopDocuments("in"s).empty(), "Stop words must be excluded from documents"s);
     }
 }
 
-void TestSearchServer()
-{
+void TestSearchServer() {
     RUN_TEST(TestExcludeStopWordsFromAddedDocumentContent);
     RUN_TEST(TestAddDocument);
     RUN_TEST(TestMinusWords);
@@ -304,28 +283,93 @@ void TestSearchServer()
     RUN_TEST(TestSearchByPredicate);
 }
 
-// --------- Окончание модульных тестов поисковой системы -----------
-int main()
-{
-    TestSearchServer();
-    SearchServer search_server("and in at"s);
-    RequestQueue request_queue(search_server);
-    search_server.AddDocument(1, "curly cat curly tail"s, DocumentStatus::ACTUAL, {7, 2, 7});
-    search_server.AddDocument(2, "curly dog and fancy collar"s, DocumentStatus::ACTUAL, {1, 2, 3});
-    search_server.AddDocument(3, "big cat fancy collar "s, DocumentStatus::ACTUAL, {1, 2, 8});
-    search_server.AddDocument(4, "big dog sparrow Eugene"s, DocumentStatus::ACTUAL, {1, 3, 2});
-    search_server.AddDocument(5, "big dog sparrow Vasiliy"s, DocumentStatus::ACTUAL, {1, 1, 1});
-    // 1439 запросов с нулевым результатом
-    for (int i = 0; i < 1439; ++i)
-    {
-        request_queue.AddFindRequest("empty request"s);
+
+void RemoveDuplicates(SearchServer &search_server) {
+
+    vector<int> documents_to_remove;
+
+    map<set<string>, int> words2doc_id;
+    set<string> words_in_doc;
+    for (int document_id: search_server) {
+        words_in_doc.clear();
+        for (const auto [word, freqs]: search_server.GetWordFrequencies(document_id)) {
+            words_in_doc.insert(word);
+        }
+
+        if (words2doc_id.count(words_in_doc) == 0) {
+            words2doc_id[words_in_doc] = document_id;
+        } else {
+
+            documents_to_remove.push_back(document_id);
+        }
+
     }
-    // все еще 1439 запросов с нулевым результатом
-    request_queue.AddFindRequest("curly dog"s);
-    // новые сутки, первый запрос удален, 1438 запросов с нулевым результатом
-    request_queue.AddFindRequest("big collar"s);
-    // первый запрос удален, 1437 запросов с нулевым результатом
-    request_queue.AddFindRequest("sparrow"s);
-    cout << "Total empty requests: "s << request_queue.GetNoResultRequests() << endl;
-    return 0;
+    for (int document_id: documents_to_remove) {
+        cout << "Found duplicate document id " << document_id << endl;
+        search_server.RemoveDocument(document_id);
+    }
 }
+
+void AddDocument(SearchServer &search_server, int document_id, const string &document, DocumentStatus status,
+                 const vector<int> &ratings) {
+    search_server.AddDocument(document_id, document, status, ratings);
+
+}
+// --------- Окончание модульных тестов поисковой системы -----------
+
+int main() {
+    TestSearchServer();
+    SearchServer search_server("and with"s);
+
+    AddDocument(search_server, 1, "funny pet and nasty rat"s, DocumentStatus::ACTUAL, {7, 2, 7});
+    AddDocument(search_server, 2, "funny pet with curly hair"s, DocumentStatus::ACTUAL, {1, 2});
+
+    // дубликат документа 2, будет удалён
+    AddDocument(search_server, 3, "funny pet with curly hair"s, DocumentStatus::ACTUAL, {1, 2});
+
+    // отличие только в стоп-словах, считаем дубликатом
+    AddDocument(search_server, 4, "funny pet and curly hair"s, DocumentStatus::ACTUAL, {1, 2});
+
+    // множество слов такое же, считаем дубликатом документа 1
+    AddDocument(search_server, 5, "funny funny pet and nasty nasty rat"s, DocumentStatus::ACTUAL, {1, 2});
+
+    // добавились новые слова, дубликатом не является
+    AddDocument(search_server, 6, "funny pet and not very nasty rat"s, DocumentStatus::ACTUAL, {1, 2});
+
+    // множество слов такое же, как в id 6, несмотря на другой порядок, считаем дубликатом
+    AddDocument(search_server, 7, "very nasty rat and not very funny pet"s, DocumentStatus::ACTUAL, {1, 2});
+
+    // есть не все слова, не является дубликатом
+    AddDocument(search_server, 8, "pet with rat and rat and rat"s, DocumentStatus::ACTUAL, {1, 2});
+
+    // слова из разных документов, не является дубликатом
+    AddDocument(search_server, 9, "nasty rat with curly hair"s, DocumentStatus::ACTUAL, {1, 2});
+
+    cout << "Before duplicates removed: "s << search_server.GetDocumentCount() << endl;
+    RemoveDuplicates(search_server);
+    cout << "After duplicates removed: "s << search_server.GetDocumentCount() << endl;
+}
+//int main()
+//{
+//    TestSearchServer();
+//    SearchServer search_server("and in at"s);
+//    RequestQueue request_queue(search_server);
+//    search_server.AddDocument(1, "curly cat curly tail"s, DocumentStatus::ACTUAL, {7, 2, 7});
+//    search_server.AddDocument(2, "curly dog and fancy collar"s, DocumentStatus::ACTUAL, {1, 2, 3});
+//    search_server.AddDocument(3, "big cat fancy collar "s, DocumentStatus::ACTUAL, {1, 2, 8});
+//    search_server.AddDocument(4, "big dog sparrow Eugene"s, DocumentStatus::ACTUAL, {1, 3, 2});
+//    search_server.AddDocument(5, "big dog sparrow Vasiliy"s, DocumentStatus::ACTUAL, {1, 1, 1});
+//    // 1439 запросов с нулевым результатом
+//    for (int i = 0; i < 1439; ++i)
+//    {
+//        request_queue.AddFindRequest("empty request"s);
+//    }
+//    // все еще 1439 запросов с нулевым результатом
+//    request_queue.AddFindRequest("curly dog"s);
+//    // новые сутки, первый запрос удален, 1438 запросов с нулевым результатом
+//    request_queue.AddFindRequest("big collar"s);
+//    // первый запрос удален, 1437 запросов с нулевым результатом
+//    request_queue.AddFindRequest("sparrow"s);
+//    cout << "Total empty requests: "s << request_queue.GetNoResultRequests() << endl;
+//    return 0;
+//}
