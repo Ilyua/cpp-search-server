@@ -14,6 +14,7 @@
 #include "request_queue.h"
 #include "paginator.h"
 #include "read_input_functions.h"
+#include "remove_duplicates.h"
 
 using namespace std;
 
@@ -284,31 +285,6 @@ void TestSearchServer() {
 }
 
 
-void RemoveDuplicates(SearchServer &search_server) {
-
-    vector<int> documents_to_remove;
-
-    map<set<string>, int> words2doc_id;
-    set<string> words_in_doc;
-    for (int document_id: search_server) {
-        words_in_doc.clear();
-        for (const auto [word, freqs]: search_server.GetWordFrequencies(document_id)) {
-            words_in_doc.insert(word);
-        }
-
-        if (words2doc_id.count(words_in_doc) == 0) {
-            words2doc_id[words_in_doc] = document_id;
-        } else {
-
-            documents_to_remove.push_back(document_id);
-        }
-
-    }
-    for (int document_id: documents_to_remove) {
-        cout << "Found duplicate document id " << document_id << endl;
-        search_server.RemoveDocument(document_id);
-    }
-}
 
 void AddDocument(SearchServer &search_server, int document_id, const string &document, DocumentStatus status,
                  const vector<int> &ratings) {
@@ -319,6 +295,7 @@ void AddDocument(SearchServer &search_server, int document_id, const string &doc
 
 int main() {
     TestSearchServer();
+
     SearchServer search_server("and with"s);
 
     AddDocument(search_server, 1, "funny pet and nasty rat"s, DocumentStatus::ACTUAL, {7, 2, 7});
