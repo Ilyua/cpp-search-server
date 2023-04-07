@@ -29,6 +29,12 @@ enum class DocumentStatus
     REMOVED,
 };
 
+struct DocumentData
+{
+    int rating;
+    DocumentStatus status;
+};
+
 std::ostream &operator<<(std::ostream &out, const DocumentStatus &status);
 
 std::ostream &operator<<(std::ostream &out, const Document &doc);

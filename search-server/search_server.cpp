@@ -9,13 +9,41 @@ SearchServer::SearchServer(const std::string &stop_words_text)
 {
 }
 
-int SearchServer::GetDocumentId(int index)
+
+// int SearchServer::GetDocumentId(int index)
+// {
+//     return index_to_id.at(index);
+// }
+vector<int>::const_iterator SearchServer::begin()
+
 {
-    return index_to_id.at(index);
+    const auto it = index_to_id.begin();
+    return it;
+}
+vector<int>::const_iterator SearchServer::end()
+
+{
+    const auto it = index_to_id.end();
+    return it;
 }
 
+const map<string, double>&  SearchServer::GetWordFrequencies(const int document_id) const{
+    static const map<string, double> res;
+
+    auto resultIt = document2words_freqs.find(document_id);
+
+    if (resultIt != document2words_freqs.end())
+    {
+        return resultIt -> second;
+    }
+    else
+    {
+        static const map<string, double> res;
+        return res;
+    }
+}
 void SearchServer::AddDocument(int document_id, const std::string &document,
-                                DocumentStatus status, const std::vector<int> &ratings)
+                                              DocumentStatus status, const std::vector<int> &ratings)
 {
     if (document_id < 0)
     {
@@ -35,6 +63,7 @@ void SearchServer::AddDocument(int document_id, const std::string &document,
     for (const std::string &word : words)
     {
         word_to_document_freqs_[word][document_id] += inv_word_count;
+        document2words_freqs[document_id][word] += inv_word_count;
     }
     documents_.emplace(document_id, DocumentData{ComputeAverageRating(ratings), status});
     index_to_id.push_back(document_id);
@@ -51,6 +80,25 @@ std::vector<Document> SearchServer::FindTopDocuments(const std::string &raw_quer
 {
     return FindTopDocuments(raw_query, DocumentStatus::ACTUAL);
 }
+
+void SearchServer::RemoveDocument(int document_id)
+{ 
+    // std::map<std::string, std::map<int, double>> word_to_document_freqs_;
+    for (auto [word, doc2freqs] : word_to_document_freqs_){
+        doc2freqs.erase(document_id);
+    }
+
+    // std::map<int, std::map<std::string, double>> document2words_freqs;
+    document2words_freqs.erase(document_id);
+
+    // std::map<int, DocumentData> documents_;
+    documents_.erase(document_id);
+
+    // std::vector<int> index_to_id;
+    index_to_id.erase(find(index_to_id.begin(),index_to_id.end(), document_id));
+
+}
+
 
 std::tuple<std::vector<std::string>, DocumentStatus> SearchServer::MatchDocument(const std::string &raw_query,
                                                                                     int document_id) const
