@@ -13,11 +13,12 @@
 #include <iostream>
 #include <functional>
 #include <execution>
+#include <list>
 
 #include "document.h"
 #include "string_processing.h"
 
-// using namespace std::literals::string_literals; // шта? а как приставить к оператору s std?
+ using namespace std::literals::string_literals; // шта? а как приставить к оператору s std?
 
 
 // нешаблонные выносить 
@@ -29,7 +30,7 @@ class SearchServer
 public:
    
     explicit SearchServer(const std::string &stop_words_text);
-    explicit SearchServer(const std::string_view &stop_words_text);
+    explicit SearchServer(const std::string_view stop_words_text);
 
     std::set<int>::const_iterator begin();
     std::set<int>::const_iterator end();
@@ -38,7 +39,7 @@ public:
     void RemoveDocument(std::execution::sequenced_policy, int document_id);
     void RemoveDocument(std::execution::parallel_policy, int document_id);
     void RemoveDocument(int document_id);
-
+    static std::vector<std::string_view>  SplitIntoWords(std::string_view text) ;
     const std::map<std::string_view, double> &GetWordFrequencies(int document_id) const;
     
 
@@ -104,37 +105,37 @@ private:
     struct Query
     {
         std::set<std::string_view, std::less<>> plus_words;
-        std::set<std::string, std::less<>> minus_words;
+        std::set<std::string_view, std::less<>> minus_words;
     };
     std::set<std::string, std::less<>> stop_words_;
     std::map<std::string_view, std::map<int, double>> word_to_document_freqs_;
     std::map<int, std::map<std::string_view, double>> document2words_freqs;
-    std::vector<std::string> documents_texts;
+    std::list<std::string> documents_texts;
     std::map<int, DocumentData> documents_;
     std::set<int> index_to_id;
 
 
-    bool IsValidWord(const std::string_view &word) const;
-    bool IsStopWord(const std::string_view &word) const;
-    std::vector<std::string_view> SplitIntoWordsNoStop(const std::string_view &text) const;
+    bool IsValidWord(const std::string_view word) const;
+    bool IsStopWord(const std::string_view word) const;
 
 
 
-    std::vector<std::string_view>  SplitIntoWords(const std::string_view &text) const;
+
+    std::vector<std::string_view> SplitIntoWordsNoStop(std::string_view text) const;
 
 
     static int ComputeAverageRating(const std::vector<int> &ratings);
     QueryWord ParseQueryWord(std::string_view text) const;
     bool IsInvalidQueryWord(std::string_view word) const;
-    Query ParseQuery(const std::string_view &text) const;
-    double ComputeWordInverseDocumentFreq(const std::string_view &word) const;
+    Query ParseQuery(const std::string_view text) const;
+    double ComputeWordInverseDocumentFreq(const std::string_view word) const;
 
 
     template <typename Predicate>
     std::vector<Document> FindAllDocuments(const Query &query, Predicate predicate) const
     {
         std::map<int, double> document_to_relevance;
-        for (const std::string_view &word : query.plus_words)
+        for (const std::string_view word : query.plus_words)
         {
             if (word_to_document_freqs_.count(word) == 0)
             {
@@ -150,7 +151,7 @@ private:
             }
         }
 
-        for (const std::string &word : query.minus_words)
+        for (std::string_view word : query.minus_words)
         {
             if (word_to_document_freqs_.count(word) == 0)
             {

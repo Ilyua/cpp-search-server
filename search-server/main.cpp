@@ -88,6 +88,74 @@ void TestAddDocument() {
     }
 }
 
+void TestSplitWords() {
+    auto test = [](auto result, auto expect) {
+        ASSERT_EQUAL(expect.size(), result.size());
+        for (unsigned int i = 0; i < expect.size(); ++i) {
+            ASSERT(expect[i] == result[i]);
+        }
+    };
+
+    {
+        const string content = "cat in the city"s;
+        auto expect  = std::vector<string_view>{
+                "cat",
+                "in",
+                "the",
+                "city"
+        };
+        auto result = SearchServer::SplitIntoWords(content);
+
+        test(result, expect);
+    }
+
+    {
+        const string content = "cat    "s;
+        auto expect  = std::vector<string_view>{"cat"};
+        auto result = SearchServer::SplitIntoWords(content);
+
+        test(result, expect);
+    }
+
+    {
+        const string content = "cat     city"s;
+        auto expect  = std::vector<string_view>{"cat","city"};
+        auto result = SearchServer::SplitIntoWords(content);
+
+        test(result, expect);
+    }
+
+    {
+        const string content = "   cat     city"s;
+        auto expect  = std::vector<string_view>{"cat","city"};
+        auto result = SearchServer::SplitIntoWords(content);
+
+        test(result, expect);
+    }
+
+    {
+        const string content = "   cat     city   "s;
+        auto expect  = std::vector<string_view>{"cat","city"};
+        auto result = SearchServer::SplitIntoWords(content);
+
+        test(result, expect);
+    }
+
+    {
+        const string content = ""s;
+        auto expect  = std::vector<string_view>{};
+        auto result = SearchServer::SplitIntoWords(content);
+
+        test(result, expect);
+    }
+
+
+
+    {
+
+    }
+}
+
 void TestMinusWords() {
     const int doc_id = 42;
     const string content = "cat in the city"s;
@@ -277,6 +345,7 @@ void TestExcludeStopWordsFromAddedDocumentContent() {
 }
 
 void TestSearchServer() {
+    RUN_TEST(TestSplitWords);
     RUN_TEST(TestExcludeStopWordsFromAddedDocumentContent);
     RUN_TEST(TestAddDocument);
     RUN_TEST(TestMinusWords);
@@ -386,7 +455,7 @@ void Test(string_view mark, SearchServer search_server, const string& query, Exe
 #define TEST(policy) Test(#policy, search_server, query, execution::policy)
 
 int main() {
-//    TestSearchServer();
+    TestSearchServer();
     mt19937 generator;
 
     const auto dictionary = GenerateDictionary(generator, 10000, 10);

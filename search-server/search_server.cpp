@@ -10,7 +10,7 @@ SearchServer::SearchServer(const std::string &stop_words_text)
 {
 }
 
-SearchServer::SearchServer(const std::string_view &stop_words_text)
+SearchServer::SearchServer(std::string_view stop_words_text)
         : SearchServer(
         SplitIntoWords(stop_words_text)) // Invoke delegating constructor from string container
 {
@@ -64,9 +64,9 @@ void SearchServer::AddDocument(int document_id, const std::string &document,
 
     documents_texts.push_back(document);
 
-    const std::vector<std::string_view> words = SplitIntoWordsNoStop(std::string_view(*documents_texts.end()));
+    const std::vector<std::string_view> words = SplitIntoWordsNoStop(documents_texts.back());
     const double inv_word_count = 1.0 / words.size();
-    for (const std::string_view &word : words)
+    for (const std::string_view word : words)
     {
         word_to_document_freqs_[word][document_id] += inv_word_count;
         document2words_freqs[document_id][word] += inv_word_count;
@@ -127,38 +127,36 @@ void SearchServer::RemoveDocument(int document_id){
     RemoveDocument(std::execution::seq,  document_id);
 }
 
-std::tuple<std::vector<std::string_view>, DocumentStatus> SearchServer::MatchDocument(std::execution::sequenced_policy policy, const std::string &raw_query,int document_id) const {
+std::tuple<std::vector<std::string_view>, DocumentStatus>
+SearchServer::MatchDocument(std::execution::sequenced_policy policy, const std::string &raw_query, int document_id) const {
 
-        const Query query = ParseQuery(raw_query);
-        std::vector<std::string_view> matched_words;
+    const Query query = ParseQuery(raw_query);
+    std::vector<std::string_view> matched_words;
 
-        for (const std::string_view &word : query.plus_words)
-        {
-            if (word_to_document_freqs_.count(word) == 0)
-            {
-                continue;
-            }
-            if (word_to_document_freqs_.at(word).count(document_id))
-            {
-                matched_words.push_back(word);
-            }
-        }
-    for (const std::string_view &word : query.minus_words)
-    {
-        if (word_to_document_freqs_.count(word) == 0)
-        {
+    for (const std::string_view word: query.minus_words) {
+        auto it = word_to_document_freqs_.find(word);
+        if (it == word_to_document_freqs_.end()) {
             continue;
         }
-        if (word_to_document_freqs_.at(word).count(document_id))
-        {
-            matched_words.clear();
-            break;
-           //return {matched_words, documents_.at(document_id).status};
+        if (it->second.count(document_id)) {
+            return {matched_words, documents_.at(document_id).status};
         }
     }
 
-        return {matched_words, documents_.at(document_id).status};
+    for (std::string_view word: query.plus_words) {
+        auto it = word_to_document_freqs_.find(word);
+        if (it == word_to_document_freqs_.end()) {
+            continue;
+        }
+        if (it->second.count(document_id)) {
+            matched_words.push_back(word);
+        }
     }
+
+
+
+    return {matched_words, documents_.at(document_id).status};
+}
 
 
 std::tuple<std::vector<std::string_view>, DocumentStatus> SearchServer::MatchDocument(std::execution::parallel_policy policy, const std::string &raw_query,int document_id) const{
@@ -170,7 +168,7 @@ std::tuple<std::vector<std::string_view>, DocumentStatus> SearchServer::MatchDoc
     vector<string_view> minusWords ;
     vector<string_view> plusWords ;
 
-    for (const std::string_view &word : SplitIntoWords(raw_query))
+    for (std::string_view word : SplitIntoWords(raw_query))
     {
 
         const QueryWord query_word = ParseQueryWord(word);
@@ -220,22 +218,22 @@ int SearchServer::GetDocumentCount() const
     return static_cast<int>(documents_.size());
 }
 
-bool SearchServer::IsValidWord(const std::string_view &word) const
+bool SearchServer::IsValidWord(const std::string_view word) const
 {
     // A valid word must not contain special characters
     return std::none_of(word.begin(), word.end(), [](char c)
                         { return c >= '\0' && c < ' '; });
 }
 
-bool SearchServer::IsStopWord(const std::string_view &word) const
+bool SearchServer::IsStopWord(const std::string_view word) const
 {
     return stop_words_.count(word) > 0;
 }
 
-std::vector<std::string_view> SearchServer::SplitIntoWordsNoStop(const std::string_view &text) const
+std::vector<std::string_view> SearchServer::SplitIntoWordsNoStop(std::string_view text) const
 {
     std::vector<std::string_view> words;
-    for (const std::string_view &word : SplitIntoWords(text))
+    for (std::string_view word : SplitIntoWords(text))
     {
         if (!IsStopWord(word))
         {
@@ -247,27 +245,29 @@ std::vector<std::string_view> SearchServer::SplitIntoWordsNoStop(const std::stri
 
 
 
-std::vector<std::string_view> SearchServer::SplitIntoWords(const std::string_view &text) const
+std::vector<std::string_view> SearchServer::SplitIntoWords(std::string_view text)
 {
     std::vector<std::string_view> words;
-    std::string word;
-    for (const char c : text)
-    {
-        if (c == ' ')
-        {
-            if (!word.empty())
-            {
-                words.push_back(word);
-                word.clear();
-            }
-        }
-        else
-        {
-            word += c;
-        }
-    }
-    if (!word.empty())
-    {
+    std::string_view word;
+
+    // left trim
+    size_t pos = text.find_first_not_of(' ');
+    text.remove_prefix(std::min(text.size(), pos));
+
+    // rigt trim
+    pos = text.find_last_not_of(' ');
+    text.remove_suffix(std::min(text.size() , text.size() - pos - 1));
+
+    while (!text.empty()) {
+        auto pos =  text.find(' ');
+
+        word = text.substr(0, std::min(text.size() , pos));
+
+        text.remove_prefix(std::min(text.size(), pos));
+        pos = text.find_first_not_of(' ');
+
+        text.remove_prefix(std::min(text.size(), pos));
+
         words.push_back(word);
     }
 
@@ -341,11 +341,11 @@ SearchServer::QueryWord SearchServer::ParseQueryWord(std::string_view text) cons
 
 
 
-SearchServer::Query SearchServer::ParseQuery(const std::string_view &text) const
+SearchServer::Query SearchServer::ParseQuery(const std::string_view text) const
 {
     Query query;
 
-    for (const std::string_view &word : SplitIntoWords(text))
+    for (std::string_view word : SplitIntoWords(text))
     {
 
         const QueryWord query_word = ParseQueryWord(word);
@@ -353,18 +353,18 @@ SearchServer::Query SearchServer::ParseQuery(const std::string_view &text) const
         {
             if (query_word.is_minus)
             {
-                query.minus_words.insert(std::string(query_word.data));
+                query.minus_words.insert(query_word.data);
             }
             else
             {
-                query.plus_words.insert(std::string(query_word.data));
+                query.plus_words.insert(query_word.data);
             }
         }
     }
 
     return query;
 }
-double SearchServer::ComputeWordInverseDocumentFreq(const std::string_view &word) const
+double SearchServer::ComputeWordInverseDocumentFreq(const std::string_view word) const
 {
     return std::log(GetDocumentCount() * 1.0 / word_to_document_freqs_.at(word).size());
 }
