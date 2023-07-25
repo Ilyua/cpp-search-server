@@ -75,17 +75,7 @@ void SearchServer::AddDocument(int document_id, const std::string &document,
     index_to_id.insert(document_id);
 }
 
-std::vector<Document> SearchServer::FindTopDocuments(const std::string &raw_query, DocumentStatus status_seek) const
-{
 
-    return FindTopDocuments(raw_query, [status_seek]([[maybe_unused]] int document_id, DocumentStatus status, [[maybe_unused]] int rating)
-                            { return status == status_seek; });
-}
-
-std::vector<Document> SearchServer::FindTopDocuments(const std::string &raw_query) const
-{
-    return FindTopDocuments(raw_query, DocumentStatus::ACTUAL);
-}
 void SearchServer::RemoveDocument(execution::parallel_policy policy, int document_id)
 {
     if( document2words_freqs.count(document_id) == 0)
