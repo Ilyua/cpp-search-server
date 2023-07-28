@@ -56,28 +56,7 @@ std::vector<Document> SearchServer::FindTopDocuments( const std::string_view raw
 }
 
 
-std::vector<Document> SearchServer::FindTopDocuments( std::execution::sequenced_policy ,const std::string_view raw_query) const{
-    return SearchServer::FindTopDocuments(std::execution::seq, raw_query, DocumentStatus::ACTUAL);
-}
-std::vector<Document> SearchServer::FindTopDocuments( std::execution::parallel_policy ,const std::string_view raw_query) const{
-    return SearchServer::FindTopDocuments(std::execution::par, raw_query, DocumentStatus::ACTUAL);
-}
 
-
-std::vector<Document> SearchServer::FindTopDocuments( std::execution::sequenced_policy , const std::string_view raw_query, DocumentStatus status_seek  ) const {
-        return SearchServer::FindTopDocuments(std::execution::seq  ,raw_query, [status_seek]([[maybe_unused]] int document_id, DocumentStatus status, [[maybe_unused]] int rating)
-        { return status == status_seek; } );
-}
-
-std::vector<Document> SearchServer::FindTopDocuments( std::execution::parallel_policy , const std::string_view raw_query, DocumentStatus status_seek  ) const {
-    return SearchServer::FindTopDocuments(std::execution::par  ,raw_query, [status_seek]([[maybe_unused]] int document_id, DocumentStatus status, [[maybe_unused]] int rating)
-    { return status == status_seek; } );
-}
-
-
-//std::vector<Document> FindTopDocuments( std::execution::parallel_policy , const std::string_view raw_query, DocumentStatus status_seek  ) ;
-
-//
 
 void SearchServer::AddDocument(int document_id, const std::string &document,
                                               DocumentStatus status, const std::vector<int> &ratings)
